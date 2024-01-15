@@ -1,0 +1,357 @@
+@startuml
+title "タイトル画面でスタートボタンを押した時"
+
+-> TitleUI : Start()
+activate TitleUI
+
+TitleUI -> GameStateManager : ChangeState(GameSelect)
+deactivate TitleUI
+activate GameStateManager
+
+GameStateManager -> GameStateManager : 状態を変更
+
+GameStateManager -> GameStateManager : OnStateChanged.Invoke(GameSelect)
+
+GameStateManager -> SceneLoader : LoadScene(GameSelect)
+activate SceneLoader
+
+SceneLoader --> GameStateManager
+deactivate SceneLoader
+@enduml
+
+@startuml
+title "タイトル画面で終了ボタンを押した時"
+
+-> TitleUI : Exit()
+activate TitleUI
+
+TitleUI -> GameStateManager : ChangeState(ExitGame)
+deactivate TitleUI
+activate GameStateManager
+
+GameStateManager -> GameStateManager : 状態を変更
+
+GameStateManager -> GameStateManager : OnStateChanged.Invoke(ExitGame)
+
+GameStateManager -> GameStateManager : ゲームを終了
+@enduml
+
+@startuml
+title "ゲーム選択画面でゲームを選択した時"
+
+-> GameUI : PlayGame()
+activate GameUI
+
+GameUI -> GameStateManager : ChangeState(game)
+deactivate GameUI
+activate GameStateManager
+
+GameStateManager -> GameStateManager : 状態を変更
+
+GameStateManager -> GameStateManager : OnStateChanged.Invoke(InGame)
+
+GameStateManager -> SceneLoader : LoadScene(game)
+activate SceneLoader
+
+SceneLoader --> GameStateManager
+deactivate SceneLoader
+
+@enduml
+
+@startuml
+title タイトルに戻るボタンを押した時
+
+-> GameSelectUI : BackToTitle()
+activate GameSelectUI
+
+GameSelectUI -> GameStateManager : ChangeState(Title)
+deactivate GameSelectUI
+activate GameStateManager
+
+GameStateManager -> GameStateManager : 状態を変更
+
+GameStateManager -> GameStateManager : OnStateChanged.Invoke(Title)
+
+GameStateManager -> SceneLoader : LoadScene(Title)
+activate SceneLoader
+
+SceneLoader --> GameStateManager
+deactivate SceneLoader
+
+@enduml
+
+@startuml
+participant JankenManager
+participant Character
+participant PreGameUI
+participant HandSelectUI
+participant ResultUI
+title JankenManagerの初期化
+
+-> JankenManager : シーン読み込み時
+activate JankenManager
+
+JankenManager -> PreGameUI : OnClosed += SelectHand
+JankenManager -> HandSelectUI : OnClosed += OnHandSelected
+JankenManager -> ResultUI : OnClosed += OnQuitResult
+JankenManager -> JankenSystem ** : new JankenSystem()
+
+autoactivate on
+
+JankenManager -> JankenManager : Init()
+
+autoactivate off
+
+JankenManager -> JankenManager : jankenTextの内容を変更
+
+JankenManager -> JankenManager : playersをリセット\n(画面上のキャラクターを削除)
+
+JankenManager -> JankenSystem : ResetPlayer()
+
+JankenManager -> Character ** : キャラクター作成
+
+JankenManager -> JankenManager : players.Add()でプレイヤー\nとNPCを登録する
+
+note right of JankenManager : 現時点では、プレイヤーとNPCの1対1でじゃんけんする\n今後PreGameUI上で人数を変えられるようにするかも
+
+JankenManager -> JankenManager : ChangeState(PreGame)
+
+JankenManager -> PreGameUI : Open()
+@enduml
+
+@startuml
+title PreGameUIでスタートボタンを押した時
+autoactivate on
+
+-> PreGameUI : Close()
+
+PreGameUI -> PreGameUI : OnClosed.Invoke()
+
+PreGameUI -> JankenManager : SelectHand()
+
+autoactivate off
+
+JankenManager -> JankenManager : jankenTextの内容を変更
+
+alt currentState == PreGame
+JankenManager -> JankenManager : currentState\n = HandSelect
+
+loop KeyValuePair p in players
+JankenManager -> JankenSystem : AddPlayer(p.Key)
+end
+
+else
+JankenManager -> JankenManager : currentState\n = HandSelectAgain
+end
+autoactivate on
+
+loop playersが持つ全Characterに対して
+JankenManager -> Character : Thinking()
+return
+end
+
+JankenManager -> HandSelectUI : Open()
+return
+return
+return
+@enduml
+
+@startuml
+title HandSelectUIで出す手を選んだ時
+autoactivate on
+
+-> HandSelectUI : SelectHand(hand)
+
+autoactivate off
+HandSelectUI -> HandSelectUI : selectedHand = hand
+
+autoactivate on
+HandSelectUI -> HandSelectUI : Close()
+HandSelectUI -> HandSelectUI : OnClosed.Invoke()
+
+HandSelectUI -> JankenManager : OnHandSelected()
+
+autoactivate off
+JankenManager -> JankenManager : jankenTextの内容を変更
+JankenManager -> JankenManager : currentState = ShowingHands
+autoactivate on
+
+JankenManager -> HandSelectUI : 選択した手を取得
+return selectedHand
+
+autoactivate off
+JankenManager -> JankenManager : MainPlayer.hand = selectedHand
+autoactivate on
+
+note right of JankenManager : p.Key = IJankenPlayer\np.Value = Character
+
+JankenManager -> JankenSystem : Judge()
+JankenSystem -> JankenInfo **
+return result
+
+JankenManager -> JankenInfo : じゃんけんの参加者を取得
+return Participants
+
+loop KeyValuePair p in players
+autoactivate off
+JankenManager -> Character : p.ValueでCharacterを取得
+JankenManager -> Character : ShowHand(participants.GetValue(p.Key))
+end
+note right of JankenManager : JankenResultから、各参加者が出した手を取得し、対応するアニメーションを再生させている
+
+JankenManager -> JankenManager : キャラクターのアニメ\n（じゃんけんぽん）が終わるまで待つ
+JankenManager -> JankenManager : jankenTextの内容を変更
+autoactivate on
+JankenManager -> JankenInfo : じゃんけんの勝敗を取得
+return
+
+alt あいこだった
+JankenManager -> JankenManager : OnDraw()
+autoactivate off
+JankenManager -> JankenManager : SelectHand()
+autoactivate on
+return
+
+else
+JankenManager -> JankenManager : OnResult()
+note right of JankenManager : じゃんけんの勝ち負けに応じたアニメーションを再生後、ResultUIを表示する
+JankenManager -> JankenInfo : 勝った手を取得
+return winnerHand
+
+autoactivate off
+JankenManager -> JankenManager : jankenTextを勝敗に合わせ変更
+autoactivate on
+
+loop KeyValuePair p in players
+autoactivate off
+JankenManager -> Character : p.ValueでCharacterを取得
+alt 勝ったキャラクターである
+JankenManager -> Character : Happy()
+else
+JankenManager -> Character : Sad()
+end
+end
+JankenManager -> JankenManager : アニメ再生が終わるまで待つ
+JankenManager -> ResultUI : Open()
+
+return
+end
+return
+return
+return
+@enduml
+
+@startuml
+title リザルト画面を閉じた時
+
+-> ResultUI : Replay()\n(Quit())
+activate ResultUI
+
+ResultUI -> ResultUI : pushedButton\n = ReplayButton\n(= QuitButton)
+
+ResultUI -> ResultUI : Close()
+activate ResultUI
+
+ResultUI -> JankenManager : OnQuitResult()
+activate JankenManager
+
+alt pushedButton == ReplayButton
+JankenManager -> JankenManager : Init()
+else pushedButton == QuitButton
+JankenManager -> JankenManager : QuitGame()
+activate JankenManager
+JankenManager -> GameStateManager : ChangeState(GameSelect)
+deactivate JankenManager
+end 
+@enduml
+
+@startuml
+title JankenSystem.Judge()
+
+-> JankenSystem : Judge()
+activate JankenSystem
+JankenSystem -> JankenInfo **
+
+note right of JankenSystem : 各参加者が出す手を取得し、Resultに保存する
+loop IJankenPlayer p in participants
+
+JankenSystem -> IJankenPlayer : GetHand()
+activate IJankenPlayer
+
+IJankenPlayer -> JankenSystem : hand
+deactivate IJankenPlayer
+
+JankenSystem -> JankenInfo : participants.Add(p, hand)
+
+end
+
+JankenSystem -> JankenSystem : 保存した情報を基に\n勝敗を判定する
+JankenSystem -> JankenInfo : 勝敗に応じて変数に値を格納する
+@enduml
+
+@startuml
+title BaseUI.Open()
+
+-> BaseUI : Open()
+activate BaseUI
+
+BaseUI -> BaseUI : uiState = Opening
+
+alt Animationが設定されている
+BaseUI -> BaseUI : PlayAnim(true)
+activate BaseUI
+
+BaseUI --> BaseUI : OnAnimEnded()
+deactivate BaseUI
+
+else Animationが設定されていない
+
+BaseUI -> BaseUI : OnAnimEnded()
+
+end
+
+BaseUI -> BaseUI : uiState = Active
+
+BaseUI -> ButtonUtil : EnableButtons(buttons[])
+activate ButtonUtil
+
+ButtonUtil --> BaseUI
+deactivate ButtonUtil
+
+@enduml
+
+@startuml
+title BaseUI.Close()
+
+-> BaseUI : Close()
+activate BaseUI
+
+BaseUI -> BaseUI : uiState = Closing
+
+BaseUI -> ButtonUtil : DisableButtons(buttons[])
+activate ButtonUtil
+
+ButtonUtil --> BaseUI
+deactivate ButtonUtil
+
+alt Animationが設定されている
+BaseUI -> BaseUI : PlayAnim(false)
+activate BaseUI
+
+BaseUI --> BaseUI : OnAnimEnded()
+deactivate BaseUI
+
+else Animationが設定されていない
+
+BaseUI -> BaseUI : OnAnimEnded()
+
+end
+BaseUI -> BaseUI : uiState = InActive
+
+BaseUI -> BaseUI : OnClosed.Invoke()
+activate BaseUI
+
+BaseUI --> BaseUI
+deactivate BaseUI
+@enduml
+
