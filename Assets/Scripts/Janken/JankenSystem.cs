@@ -4,16 +4,16 @@ namespace JankenGame
 {
     public class JankenSystem
     {
-        JankenInfo.MatchResult[] _judgeResult =
+        JankenResult[] _judgeResult =
         {                                       //グー　チョキ　パー
-            JankenInfo.MatchResult.Draw,        //0     0       0   (起こり得ない)
-            JankenInfo.MatchResult.Draw,        //0     0       1
-            JankenInfo.MatchResult.Draw,        //0     1       0
-            JankenInfo.MatchResult.ScissorsWin, //0     1       1
-            JankenInfo.MatchResult.Draw,        //1     0       0
-            JankenInfo.MatchResult.PaperWin,    //1     0       1
-            JankenInfo.MatchResult.RockWin,     //1     1       0
-            JankenInfo.MatchResult.Draw         //1     1       1
+            JankenResult.Draw,                  //0     0       0   (起こり得ない)
+            JankenResult.Draw,                  //0     0       1
+            JankenResult.Draw,                  //0     1       0
+            JankenResult.ScissorsWin,           //0     1       1
+            JankenResult.Draw,                  //1     0       0
+            JankenResult.PaperWin,              //1     0       1
+            JankenResult.RockWin,               //1     1       0
+            JankenResult.Draw                   //1     1       1
         };
 
         List<IJankenPlayer> _participants;
@@ -23,17 +23,19 @@ namespace JankenGame
             _participants = new List<IJankenPlayer>();
         }
 
+        //じゃんけん参加者を登録
         public void AddPlayer(IJankenPlayer p)
         {
             _participants.Add(p);
         }
 
+        //じゃんけん参加者をリセット
         public void ResetPlayer()
         {
             _participants.Clear();
         }
 
-        public JankenInfo Judge()
+        public JankenResult Judge()
         {
             var participants = new Dictionary<IJankenPlayer, JankenHand>();
 
@@ -48,8 +50,16 @@ namespace JankenGame
             if (participants.ContainsValue(JankenHand.Scissors)) showedHands += 2;
             if (participants.ContainsValue(JankenHand.Paper)) showedHands += 1;
 
-            return new JankenInfo(participants, _judgeResult[showedHands]);
+            return _judgeResult[showedHands];
 
         }
+    }
+
+    public enum JankenResult
+    {
+        RockWin,        //グーの勝ち
+        ScissorsWin,    //チョキの勝ち
+        PaperWin,       //パーの勝ち
+        Draw            //あいこ
     }
 }

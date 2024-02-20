@@ -7,7 +7,7 @@ namespace JankenGame
     public class MainPlayer : IJankenPlayer
     {
         //UI“™‚Å‘I‘ð‚³‚ê‚½Žè‚ð‚±‚±‚É•Û‘¶‚·‚é
-        public JankenHand selectedHand;
+        public JankenHand PlayedHand { get; set; }
 
         public MainPlayer()
         {
@@ -16,7 +16,7 @@ namespace JankenGame
 
         public JankenHand GetHand()
         {
-            return selectedHand;
+            return PlayedHand;
         }
     }
 }

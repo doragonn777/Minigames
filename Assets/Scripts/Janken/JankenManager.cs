@@ -48,9 +48,6 @@ namespace JankenGame
 
         JankenSystem _system;
 
-        //じゃんけんの参加者(IJankenPlayer)とビュー(Character)を紐づけている
-        Dictionary<IJankenPlayer, Character> _players = new Dictionary<IJankenPlayer, Character>();
-
         private void Awake()
         {
             preGameUI.OnClosed += SelectHand;
@@ -72,7 +69,7 @@ namespace JankenGame
             _jankenText.text = TEXT_PREGAME;
 
             //マネージャが管理するじゃんけん参加者をリセット
-            _players.Clear();
+            CharacterManager.Instance.ResetCharacter();
 
             //JankenSystemの内部で管理するじゃんけん参加者をリセット
             _system.ResetPlayer();
@@ -81,13 +78,14 @@ namespace JankenGame
             _mainPlayerCharacter.Init();
             _npc.Init();
 
-            //プレイヤーが操作（＝出す手を選ぶ）する対象
-            _mainPlayer = new MainPlayer();
-
             //現時点では、じゃんけんに参加するのはプレイヤーとNPC1体のみ
             //（今後、動的に人数を変更できるようにする）
-            _players.Add(_mainPlayer, _mainPlayerCharacter);
-            _players.Add(new RandomAI(), _npc);
+            _mainPlayer = new MainPlayer(); //プレイヤーが操作する対象
+            _mainPlayerCharacter.Player = _mainPlayer;
+            CharacterManager.Instance.AddCharacter(_mainPlayerCharacter);
+
+            _npc.Player = new RandomAI();   //ランダムに手を出すNPC
+            CharacterManager.Instance.AddCharacter(_npc);
 
             _currentState = JankenState.PreGame;
             preGameUI.Open();
@@ -105,9 +103,9 @@ namespace JankenGame
                 _currentState = JankenState.HandSelect;
 
                 //じゃんけんの参加者をJankenSystemに登録
-                foreach (var p in _players)
+                foreach (var c in CharacterManager.Instance.Characters)
                 {
-                    _system.AddPlayer(p.Key);
+                    _system.AddPlayer(c.Player);
                 }
             } 
             else
@@ -117,9 +115,9 @@ namespace JankenGame
 
 
             //画面上の演出
-            foreach (var p in _players.Values)
+            foreach (var c in CharacterManager.Instance.Characters)
             {
-                p.Thinking();
+                c.Thinking();
             }
 
             handSelectUI.Open();
@@ -132,20 +130,22 @@ namespace JankenGame
         {
             _jankenText.text = TEXT_HANDSELECTED;
 
+            _currentState = JankenState.ShowingHands;
+
             //UIで選択した手を登録
-            _mainPlayer.selectedHand = handSelectUI.SelectedHand;
+            _mainPlayer.PlayedHand = handSelectUI.SelectedHand;
 
             //じゃんけんの結果を取得
-            JankenInfo info = _system.Judge();
+            JankenResult result = _system.Judge();
 
             //画面上のキャラクターに自分が出した手に対応する手を出させる
-            foreach (var p in _players)
+            foreach (var c in CharacterManager.Instance.Characters)
             {
-                p.Value.ShowHand(info.GetHand(p.Key));
+                c.ShowHand();
             }
 
             //画面上の演出を待ち、じゃんけんの結果に応じた処理をする
-            StartCoroutine(WaitJankenAnim(info));
+            StartCoroutine(WaitJankenAnim(result));
         }
 
         /// <summary>
@@ -160,16 +160,16 @@ namespace JankenGame
         /// <summary>
         /// じゃんけんの決着がついたときに呼び出される
         /// </summary>
-        private void OnResult(JankenInfo info)
+        private void OnResult(JankenResult result)
         {
             //引き分けの状態でリザルトは表示されない
-            Assert.IsTrue(info.Result != JankenInfo.MatchResult.Draw);
+            Assert.IsTrue(result != JankenResult.Draw);
 
             //グーチョキパーの並びが一致しているので明示的に変換する
-            JankenHand winnerHand = (JankenHand) info.Result;
+            JankenHand winnerHand = (JankenHand) result;
 
             //プレイヤーの勝敗に応じて表示するテキストを変更
-            if (_mainPlayer.selectedHand == winnerHand)
+            if (_mainPlayer.PlayedHand == winnerHand)
             {
                 _jankenText.text = TEXT_RESULT_WIN;
             }
@@ -178,16 +178,16 @@ namespace JankenGame
                 _jankenText.text = TEXT_RESULT_LOSE;
             }
 
-            foreach (var p in _players)
+            foreach (var c in CharacterManager.Instance.Characters)
             {
                 //じゃんけんの結果から、pに一致する参加者が出した手を取得
-                if (info.GetHand(p.Key) == winnerHand)
+                if (c.Player.PlayedHand == winnerHand)
                 {
-                    p.Value.Happy();
+                    c.Happy();
                 } 
                 else
                 {
-                    p.Value.Sad();
+                    c.Sad();
                 }
             }
 
@@ -225,7 +225,7 @@ namespace JankenGame
         const int PON_ANIM_WAIT_SEC = 1;
 
         //キャラクターの『じゃんけんぽん』という演出を待ち、勝敗に応じた処理をする
-        private IEnumerator WaitJankenAnim(JankenInfo info)
+        private IEnumerator WaitJankenAnim(JankenResult result)
         {
             yield return new WaitForSeconds(JANKEN_ANIM_WAIT_SEC);
 
@@ -236,13 +236,13 @@ namespace JankenGame
 
 
             //勝敗（引き分け）に応じて処理を変更する
-            if (info.Result == JankenInfo.MatchResult.Draw)
+            if (result == JankenResult.Draw)
             {
                 OnDraw();
             }
             else
             {
-                OnResult(info);
+                OnResult(result);
             }
         }
     }

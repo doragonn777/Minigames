@@ -19,6 +19,8 @@ namespace JankenGame
         const string TRIG_HAPPY = "Happy";
         const string TRIG_SAD = "Sad";
 
+        public IJankenPlayer Player { get; set; }
+
         //キャラクターのアニメーション制御に使用
         Animator _animator;
 
@@ -47,10 +49,14 @@ namespace JankenGame
             _animator.SetTrigger(TRIG_THINKING);
         }
 
-        public void ShowHand(JankenHand hand)
+        //じゃんけんで出した手に応じた演出を再生する
+        public void ShowHand()
         {
             //『じゃんけん…』のモーション
             _animator.SetTrigger(TRIG_SHOWHAND);
+
+            //IJankenPlayerから出した手を取得
+            JankenHand hand = Player.PlayedHand;
 
             //『ぽん！』に相当するモーション
             switch (hand)
