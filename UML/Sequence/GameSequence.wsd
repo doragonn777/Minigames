@@ -104,13 +104,13 @@ autoactivate off
 
 JankenManager -> JankenManager : jankenTextの内容を変更
 
-JankenManager -> JankenManager : playersをリセット\n(画面上のキャラクターを削除)
+JankenManager -> CharacterManager : playersをリセット\n(画面上のキャラクターを削除)
 
 JankenManager -> JankenSystem : ResetPlayer()
 
 JankenManager -> Character ** : キャラクター作成
 
-JankenManager -> JankenManager : players.Add()でプレイヤー\nとNPCを登録する
+JankenManager -> CharacterManager : プレイヤーとNPCを登録する
 
 note right of JankenManager : 現時点では、プレイヤーとNPCの1対1でじゃんけんする\n今後PreGameUI上で人数を変えられるようにするかも
 
@@ -136,8 +136,13 @@ JankenManager -> JankenManager : jankenTextの内容を変更
 alt currentState == PreGame
 JankenManager -> JankenManager : currentState\n = HandSelect
 
-loop KeyValuePair p in players
-JankenManager -> JankenSystem : AddPlayer(p.Key)
+JankenManager -> CharacterManager : Characterのリストを取得
+activate CharacterManager
+CharacterManager --> JankenManager : characterList
+deactivate CharacterManager
+
+loop characterListの各要素に対して
+JankenManager -> JankenSystem : IJankenPlayerを登録
 end
 
 else
@@ -173,7 +178,7 @@ HandSelectUI -> JankenManager : OnHandSelected()
 
 autoactivate off
 JankenManager -> JankenManager : jankenTextの内容を変更
-JankenManager -> JankenManager : currentState = ShowingHands
+JankenManager -> JankenManager : 状態をShowingHandsに変更
 autoactivate on
 
 JankenManager -> HandSelectUI : 選択した手を取得
@@ -183,27 +188,29 @@ autoactivate off
 JankenManager -> JankenManager : MainPlayer.hand = selectedHand
 autoactivate on
 
-note right of JankenManager : p.Key = IJankenPlayer\np.Value = Character
-
 JankenManager -> JankenSystem : Judge()
-JankenSystem -> JankenInfo **
 return result
 
-JankenManager -> JankenInfo : じゃんけんの参加者を取得
-return Participants
+JankenManager -> CharacterManager : じゃんけんの参加者を取得
+return characterList
 
-loop KeyValuePair p in players
+loop characterListの各要素に対して
 autoactivate off
-JankenManager -> Character : p.ValueでCharacterを取得
-JankenManager -> Character : ShowHand(participants.GetValue(p.Key))
+JankenManager -> Character : じゃんけんする演出を再生
+activate Character
+Character -> IJankenPlayer : 出した手を取得
+activate IJankenPlayer
+IJankenPlayer --> Character : playedHand
+deactivate IJankenPlayer
+Character -> Character : 出した手に応じた演出
+Character --> JankenManager
+deactivate Character
 end
-note right of JankenManager : JankenResultから、各参加者が出した手を取得し、対応するアニメーションを再生させている
 
-JankenManager -> JankenManager : キャラクターのアニメ\n（じゃんけんぽん）が終わるまで待つ
+JankenManager -> JankenManager : キャラクターの演出\n（じゃんけんぽん）が終わるまで待つ
 JankenManager -> JankenManager : jankenTextの内容を変更
 autoactivate on
-JankenManager -> JankenInfo : じゃんけんの勝敗を取得
-return
+
 
 alt あいこだった
 JankenManager -> JankenManager : OnDraw()
@@ -215,16 +222,23 @@ return
 else
 JankenManager -> JankenManager : OnResult()
 note right of JankenManager : じゃんけんの勝ち負けに応じたアニメーションを再生後、ResultUIを表示する
-JankenManager -> JankenInfo : 勝った手を取得
-return winnerHand
+
 
 autoactivate off
 JankenManager -> JankenManager : jankenTextを勝敗に合わせ変更
 autoactivate on
 
-loop KeyValuePair p in players
+JankenManager -> CharacterManager
+return characterList
+loop characterListの各要素に対して
 autoactivate off
-JankenManager -> Character : p.ValueでCharacterを取得
+JankenManager -> Character : 出した手を取得
+activate Character
+Character --> JankenManager : playedHand
+deactivate Character
+
+JankenManager -> JankenManager : 勝敗とplayedHandを比較
+
 alt 勝ったキャラクターである
 JankenManager -> Character : Happy()
 else
@@ -270,7 +284,6 @@ title JankenSystem.Judge()
 
 -> JankenSystem : Judge()
 activate JankenSystem
-JankenSystem -> JankenInfo **
 
 note right of JankenSystem : 各参加者が出す手を取得し、Resultに保存する
 loop IJankenPlayer p in participants
@@ -281,12 +294,10 @@ activate IJankenPlayer
 IJankenPlayer -> JankenSystem : hand
 deactivate IJankenPlayer
 
-JankenSystem -> JankenInfo : participants.Add(p, hand)
-
 end
 
 JankenSystem -> JankenSystem : 保存した情報を基に\n勝敗を判定する
-JankenSystem -> JankenInfo : 勝敗に応じて変数に値を格納する
+<-- JankenSystem : result
 @enduml
 
 @startuml
