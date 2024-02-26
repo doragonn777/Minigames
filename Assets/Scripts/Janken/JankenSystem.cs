@@ -37,18 +37,18 @@ namespace JankenGame
 
         public JankenResult Judge()
         {
-            var participants = new Dictionary<IJankenPlayer, JankenHand>();
+            var hands = new List<JankenHand>();
 
             foreach (var p in _participants)
             {
-                participants.Add(p, p.GetHand());
+                hands.Add(p.GetHand());
             }
 
             //ビット演算でフラグ管理をする
             int showedHands = 0;
-            if (participants.ContainsValue(JankenHand.Rock)) showedHands += 4;
-            if (participants.ContainsValue(JankenHand.Scissors)) showedHands += 2;
-            if (participants.ContainsValue(JankenHand.Paper)) showedHands += 1;
+            if (hands.Contains(JankenHand.Rock))        showedHands += 4;
+            if (hands.Contains(JankenHand.Scissors))    showedHands += 2;
+            if (hands.Contains(JankenHand.Paper))       showedHands += 1;
 
             return _judgeResult[showedHands];
 

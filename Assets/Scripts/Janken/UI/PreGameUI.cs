@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace JankenGame
 {
-    public class PreGameUI : BaseUI
+    public class PregameUI : BaseUI
     {
 
     }

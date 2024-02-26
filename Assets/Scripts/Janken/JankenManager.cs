@@ -1,5 +1,5 @@
 using System.Collections;
-using System.Collections.Generic;
+using System;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.UI;
@@ -8,15 +8,18 @@ namespace JankenGame
 {
     public enum JankenState
     {
-        PreGame,            //ゲーム開始前
+        Pregame,            //ゲーム開始前
         HandSelect,         //プレイヤーが出す手を選択している状態
-        ShowingHands,       //じゃんけんをする演出中
         HandSelectAgain,    //あいこで再度手を選択している状態
+        PlayJanken,         //じゃんけんをする演出中
+        JankenEnded,        //じゃんけんの演出が終了した状態
         Result              //じゃんけんの決着がついた状態
     }
 
     public class JankenManager : MonoBehaviour
     {
+        public static JankenManager Instance { get; private set; }
+
         //ゲームの進行に合わせて画面上に表示されるテキスト
         const string TEXT_PREGAME = "";
         const string TEXT_SELECTHAND = "Select your hand!";
@@ -30,35 +33,47 @@ namespace JankenGame
 
         [SerializeField]
         Character _mainPlayerCharacter;     //プレイヤーに対応するキャラクター
-        MainPlayer _mainPlayer;             //プレイヤーが選択した手を保存するクラス
+        
+        MainPlayer _mainPlayer;      //プレイヤーが選択した手を保存するクラス
+        
+        //出す手を選択するUI等が選択した手を登録するためのプロパティ
+        public MainPlayer MainPlayer { get { return _mainPlayer; } }
 
         [SerializeField]
         Character _npc;             //NPCに対応するキャラクター
-
-        [SerializeField]
-        BaseUI preGameUI;           //ゲーム開始前に表示されるUI
-
-        [SerializeField]
-        HandSelectUI handSelectUI;  //プレイヤーが出す手を選択するUI
-
-        [SerializeField]
-        ResultUI resultUI;          //じゃんけんの結果を表示するUI
 
         JankenState _currentState;  //現在の状態
 
         JankenSystem _system;
 
+        public Action<JankenState> OnStateChanged;
+
         private void Awake()
         {
-            preGameUI.OnClosed += SelectHand;
-            handSelectUI.OnClosed += OnHandSelected;
-            resultUI.OnClosed += OnQuitResult;
+            if (Instance == null)
+            {
+                Instance = this;
+            }
+            else
+            {
+                Destroy(gameObject);
+            }
+
             _system = new JankenSystem();
         }
 
         private void Start()
         {
+            UIManager.Instance.OnPregameUIClosed += OnHandSelect;
+            UIManager.Instance.OnHandSelectUIClosed += OnPlayJanken;
             Init();
+        }
+
+        //ゲームの状態を変更し、それを通知する
+        private void ChangeState(JankenState state)
+        {
+            _currentState = state;
+            OnStateChanged?.Invoke(state);
         }
 
         /// <summary>
@@ -66,6 +81,8 @@ namespace JankenGame
         /// </summary>
         private void Init()
         {
+            ChangeState(JankenState.Pregame);
+
             _jankenText.text = TEXT_PREGAME;
 
             //マネージャが管理するじゃんけん参加者をリセット
@@ -86,19 +103,16 @@ namespace JankenGame
 
             _npc.Player = new RandomAI();   //ランダムに手を出すNPC
             CharacterManager.Instance.AddCharacter(_npc);
-
-            _currentState = JankenState.PreGame;
-            preGameUI.Open();
         }
 
         /// <summary>
         /// HandSelectUIを表示し、出す手を選ばせる
         /// </summary>
-        private void SelectHand()
+        private void OnHandSelect()
         {
             _jankenText.text = TEXT_SELECTHAND;
 
-            if (_currentState == JankenState.PreGame)
+            if (_currentState == JankenState.Pregame)
             {
                 _currentState = JankenState.HandSelect;
 
@@ -120,20 +134,19 @@ namespace JankenGame
                 c.Thinking();
             }
 
-            handSelectUI.Open();
+            ChangeState(JankenState.HandSelect);
         }
 
         /// <summary>
         /// HandSelectUIが閉じた時に呼び出される
         /// </summary>
-        private void OnHandSelected()
+        private void OnPlayJanken()
         {
+            ChangeState(JankenState.PlayJanken);
+
             _jankenText.text = TEXT_HANDSELECTED;
 
-            _currentState = JankenState.ShowingHands;
-
-            //UIで選択した手を登録
-            _mainPlayer.PlayedHand = handSelectUI.SelectedHand;
+            _currentState = JankenState.PlayJanken;
 
             //じゃんけんの結果を取得
             JankenResult result = _system.Judge();
@@ -154,7 +167,7 @@ namespace JankenGame
         private void OnDraw()
         {
             //TODO: 「あいこで…」的な文字を表示させる
-            SelectHand();
+            OnHandSelect();
         }
 
         /// <summary>
@@ -164,6 +177,8 @@ namespace JankenGame
         {
             //引き分けの状態でリザルトは表示されない
             Assert.IsTrue(result != JankenResult.Draw);
+
+            ChangeState(JankenState.Result);
 
             //グーチョキパーの並びが一致しているので明示的に変換する
             JankenHand winnerHand = (JankenHand) result;
@@ -190,31 +205,16 @@ namespace JankenGame
                     c.Sad();
                 }
             }
-
-            //TODO: 上記の演出が完了するまで待つ
-
-            resultUI.Open();
         }
 
-        /// <summary>
-        /// ResultUIが閉じた時に呼び出される
-        /// </summary>
-        private void OnQuitResult()
+        //リプレイボタン等が押された時に呼び出す
+        public void OnReplay()
         {
-            if (resultUI.pushedButton == ResultUI.PushedButton.ReplayButton)
-            {
-                Init();
-            }
-            else
-            {
-                QuitGame();
-            }
+            GameStateManager.Instance.ChangeState(Games.Janken);
         }
 
-        /// <summary>
-        /// じゃんけんを終了し、ゲーム選択画面に戻る
-        /// </summary>
-        private void QuitGame()
+        //ゲーム終了ボタン等が押された時に呼び出す
+        public void OnQuit()
         {
             GameStateManager.Instance.ChangeState(GameState.GameSelect);
         }
@@ -234,6 +234,7 @@ namespace JankenGame
             //じゃんけんする演出の完了を待つ
             yield return new WaitForSeconds(PON_ANIM_WAIT_SEC);
 
+            ChangeState(JankenState.JankenEnded);
 
             //勝敗（引き分け）に応じて処理を変更する
             if (result == JankenResult.Draw)

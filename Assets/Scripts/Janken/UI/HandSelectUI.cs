@@ -24,6 +24,12 @@ namespace JankenGame
             _selectedHand = JankenHand.Paper;
             Close();
         }
+
+        public override void Close()
+        {
+            JankenManager.Instance.MainPlayer.PlayedHand = _selectedHand;
+            base.Close();
+        }
     }
 
 }

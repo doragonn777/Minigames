@@ -1,29 +1,20 @@
-
-public class ResultUI : BaseUI
+namespace JankenGame
 {
-    //プレイヤーが勝利したかどうか（勝敗に応じてUIの表示内容を変更する）
-    public bool _doesPlayerWin;
 
-    public enum PushedButton
+    public class ResultUI : BaseUI
     {
-        ReplayButton,
-        QuitButton,
-        Null
+        //プレイヤーが勝利したかどうか（勝敗に応じてUIの表示内容を変更する）
+        public bool _doesPlayerWin;
+
+        public void Replay()
+        {
+            JankenManager.Instance.OnReplay();
+        }
+
+        public void Quit()
+        {
+            JankenManager.Instance.OnQuit();
+        }
     }
 
-    //UIの所持者が押されたボタンを識別するために使用
-    PushedButton _pushedButton = PushedButton.Null;
-    public PushedButton pushedButton => _pushedButton;
-
-    public void Replay()
-    {
-        _pushedButton = PushedButton.ReplayButton;
-        Close();
-    }
-
-    public void Quit()
-    {
-        _pushedButton = PushedButton.QuitButton;
-        Close();
-    }
 }
