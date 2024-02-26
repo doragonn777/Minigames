@@ -81,26 +81,34 @@ deactivate SceneLoader
 @enduml
 
 @startuml
-participant JankenManager
-participant Character
-participant PreGameUI
-participant HandSelectUI
-participant ResultUI
+
 title JankenManagerの初期化
 
 -> JankenManager : シーン読み込み時
-activate JankenManager
-
-JankenManager -> PreGameUI : OnClosed += SelectHand
-JankenManager -> HandSelectUI : OnClosed += OnHandSelected
-JankenManager -> ResultUI : OnClosed += OnQuitResult
 JankenManager -> JankenSystem ** : new JankenSystem()
+
+
+JankenManager -> UIManager : 各UIのOnClosedを監視
+
+UIManager -> JankenManager : 状態変更を監視
+UIManager -> PreGameUI : OnClosedを監視
+UIManager -> HandSelectUI : OnClosedを監視
+UIManager -> ResultUI : OnClosedを監視
+UIManager -> PreGameUI : Open()
+
+
+
+
+
+return
 
 autoactivate on
 
 JankenManager -> JankenManager : Init()
 
 autoactivate off
+
+JankenManager -> JankenManager : 状態をPregameに変更
 
 JankenManager -> JankenManager : jankenTextの内容を変更
 
@@ -114,7 +122,7 @@ JankenManager -> CharacterManager : プレイヤーとNPCを登録する
 
 note right of JankenManager : 現時点では、プレイヤーとNPCの1対1でじゃんけんする\n今後PreGameUI上で人数を変えられるようにするかも
 
-JankenManager -> JankenManager : ChangeState(PreGame)
+
 
 JankenManager -> PreGameUI : Open()
 @enduml
@@ -125,11 +133,15 @@ autoactivate on
 
 -> PreGameUI : Close()
 
-PreGameUI -> PreGameUI : OnClosed.Invoke()
-
-PreGameUI -> JankenManager : SelectHand()
-
 autoactivate off
+
+PreGameUI -> UIManager : イベント通知
+deactivate PreGameUI
+activate UIManager
+
+UIManager -> JankenManager : イベント通知
+deactivate UIManager
+activate JankenManager
 
 JankenManager -> JankenManager : jankenTextの内容を変更
 
@@ -155,10 +167,17 @@ JankenManager -> Character : Thinking()
 return
 end
 
-JankenManager -> HandSelectUI : Open()
-return
-return
-return
+autoactivate off
+JankenManager -> JankenManager : HandSelect状態に変更
+JankenManager -> UIManager : イベント通知
+activate UIManager
+UIManager -> HandSelectUI : Open()
+UIManager --> JankenManager
+deactivate UIManager
+autoactivate on
+
+
+
 @enduml
 
 @startuml
@@ -170,23 +189,28 @@ autoactivate on
 autoactivate off
 HandSelectUI -> HandSelectUI : selectedHand = hand
 
-autoactivate on
+HandSelectUI -> JankenManager : 操作キャラクターを取得
+activate JankenManager
+JankenManager --> HandSelectUI : mainPlayer
+deactivate JankenManager
+
+HandSelectUI -> MainCharacter : 選択した手を登録
+
 HandSelectUI -> HandSelectUI : Close()
-HandSelectUI -> HandSelectUI : OnClosed.Invoke()
 
-HandSelectUI -> JankenManager : OnHandSelected()
 
-autoactivate off
+HandSelectUI -> UIManager : イベント通知
+deactivate HandSelectUI
+activate UIManager
+
+UIManager -> JankenManager : イベント通知
+deactivate UIManager
+activate JankenManager
+
+JankenManager -> JankenManager : 状態をPlayJankenに変更
 JankenManager -> JankenManager : jankenTextの内容を変更
-JankenManager -> JankenManager : 状態をShowingHandsに変更
 autoactivate on
 
-JankenManager -> HandSelectUI : 選択した手を取得
-return selectedHand
-
-autoactivate off
-JankenManager -> JankenManager : MainPlayer.hand = selectedHand
-autoactivate on
 
 JankenManager -> JankenSystem : Judge()
 return result
@@ -208,6 +232,9 @@ deactivate Character
 end
 
 JankenManager -> JankenManager : キャラクターの演出\n（じゃんけんぽん）が終わるまで待つ
+
+JankenManager -> JankenManager : 状態をJankenEndedに変更
+
 JankenManager -> JankenManager : jankenTextの内容を変更
 autoactivate on
 
@@ -215,14 +242,21 @@ autoactivate on
 alt あいこだった
 JankenManager -> JankenManager : OnDraw()
 autoactivate off
-JankenManager -> JankenManager : SelectHand()
+note right of JankenManager : PregameUIを閉じた時のシーケンスと同様
+JankenManager -> JankenManager : OnHandSelect()
 autoactivate on
 return
 
 else
 JankenManager -> JankenManager : OnResult()
-note right of JankenManager : じゃんけんの勝ち負けに応じたアニメーションを再生後、ResultUIを表示する
 
+autoactivate off
+JankenManager -> JankenManager : 状態をResultに変更
+autoactivate on
+JankenManager -> UIManager : イベント通知
+UIManager -> ResultUI : Open()
+return
+return
 
 autoactivate off
 JankenManager -> JankenManager : jankenTextを勝敗に合わせ変更
@@ -245,14 +279,10 @@ else
 JankenManager -> Character : Sad()
 end
 end
-JankenManager -> JankenManager : アニメ再生が終わるまで待つ
-JankenManager -> ResultUI : Open()
-
 return
 end
-return
-return
-return
+
+
 @enduml
 
 @startuml
@@ -261,22 +291,16 @@ title リザルト画面を閉じた時
 -> ResultUI : Replay()\n(Quit())
 activate ResultUI
 
-ResultUI -> ResultUI : pushedButton\n = ReplayButton\n(= QuitButton)
-
-ResultUI -> ResultUI : Close()
-activate ResultUI
-
-ResultUI -> JankenManager : OnQuitResult()
+ResultUI -> JankenManager : OnReplay\n(OnQuit)
+deactivate ResultUI
 activate JankenManager
 
-alt pushedButton == ReplayButton
+alt リプレイを選択
 JankenManager -> JankenManager : Init()
-else pushedButton == QuitButton
-JankenManager -> JankenManager : QuitGame()
-activate JankenManager
+
+else 退出を選択
 JankenManager -> GameStateManager : ChangeState(GameSelect)
-deactivate JankenManager
-end 
+end
 @enduml
 
 @startuml
